@@ -25,6 +25,19 @@ for key, default in {
 
 teams = st.session_state.teams
 
+
+def build_matches(teams):
+    matches = []
+    for i in range(0, len(teams), 2):
+        left = teams[i]
+        right = teams[i+1] if i+1 < len(teams) else "BYE"
+        matches.append({
+            "left": left,
+            "right": right,
+            "winner": None,
+            "loser": None
+        })
+    return matches
 # ========================= Helper Functions =========================
 def sequential_search(name):
     for i, t in enumerate(teams):
@@ -383,7 +396,10 @@ with tab3:
                     team_names = [t["name"] for t in teams]
                     random.shuffle(team_names)
                     st.session_state.tournament_type = t_type
-                    st.session_state.bracket_matches = build_bracket_matches(team_names)
+                    st.session_state.upper_matches = build_matches(team_names)
+                    st.session_state.lower_matches = []
+                    st.session_state.lower_queue = []
+
                     st.session_state.current_match_index = 0
                     st.session_state.tournament_phase = "upper"
                     st.session_state.tournament_log = [f"🎮 **{t_type}** เริ่มแล้ว! ({len(teams)} ทีม)"]
@@ -452,36 +468,53 @@ with tab3:
             save_round_to_history(phase, matches)
 
             if phase == "upper":
+                winners = []
+                losers = []
+
+                for m in matches:
+                    if m["winner"]:
+                        winners.append(m["winner"])
+                        losers.append(m["loser"])
+
                 if len(winners) == 1:
-                    if st.session_state.tournament_type == "Single Elimination":
-                        st.session_state.champion = winners[0]; st.rerun()
-                    else:
-                        st.session_state.upper_winner = winners[0]
-                        lower_teams = [t["name"] for t in teams if t["loss"] == 1]
-                        if len(lower_teams) > 1:
-                            random.shuffle(lower_teams)
-                            st.session_state.bracket_matches = build_bracket_matches(lower_teams)
-                            st.session_state.current_match_index = 0
-                            st.session_state.tournament_phase = "lower"
-                            st.session_state.tournament_log.append("🔴 **Lower Bracket** เริ่ม!")
-                        else:
-                            st.session_state.lower_winner = lower_teams[0] if lower_teams else None
-                            st.session_state.tournament_phase = "grand_final"
-                        st.rerun()
-                else:
-                    st.session_state.bracket_matches = build_bracket_matches(winners)
-                    st.session_state.current_match_index = 0; st.rerun()
-            elif phase == "lower":
-                if len(winners) == 1:
-                    gf = [st.session_state.upper_winner, winners[0]]
-                    st.session_state.bracket_matches = build_bracket_matches(gf)
+                    # ได้แชมป์ Upper
+                    st.session_state.upper_winner = winners[0]
+
+                    # เอาคนแพ้ทั้งหมดไป Lower
+                    st.session_state.lower_matches = build_matches(losers)
+                    st.session_state.tournament_phase = "lower"
                     st.session_state.current_match_index = 0
-                    st.session_state.tournament_phase = "grand_final"
-                    st.session_state.tournament_log.append("⭐ **Grand Final** เริ่ม!")
+                    st.session_state.tournament_log.append("🔴 **Lower Bracket เริ่ม!**")
                     st.rerun()
                 else:
-                    st.session_state.bracket_matches = build_bracket_matches(winners)
-                    st.session_state.current_match_index = 0; st.rerun()
+                    # เล่น Upper ต่อ
+                    st.session_state.upper_matches = build_matches(winners)
+
+                    # เก็บคนแพ้สะสม
+                    st.session_state.lower_queue.extend(losers)
+
+                    st.session_state.current_match_index = 0
+                    st.rerun()
+            elif phase == "lower":
+                winners = [m["winner"] for m in matches if m["winner"]]
+
+                if len(winners) == 1:
+                    # ได้ผู้ชนะ Lower
+                    st.session_state.lower_winner = winners[0]
+
+                    # ไป Grand Final
+                    gf = [st.session_state.upper_winner, winners[0]]
+                    st.session_state.bracket_matches = build_matches(gf)
+
+                    st.session_state.current_match_index = 0
+                    st.session_state.tournament_phase = "grand_final"
+                    st.session_state.tournament_log.append("⭐ **Grand Final เริ่ม!**")
+                    st.rerun()
+                else:
+                    # เล่น Lower ต่อ
+                    st.session_state.lower_matches = build_matches(winners)
+                    st.session_state.current_match_index = 0
+                    st.rerun()
             elif phase == "grand_final":
                 if winners:
                     st.session_state.champion = winners[0]; st.rerun()
