@@ -406,7 +406,12 @@ with tab3:
                     st.rerun()
     else:
         phase = st.session_state.tournament_phase
-        matches = st.session_state.bracket_matches
+        if phase == "upper":
+            matches = st.session_state.upper_matches
+        elif phase == "lower":
+            matches = st.session_state.lower_matches
+        else:
+            matches = st.session_state.bracket_matches
         idx = st.session_state.current_match_index
         phase_labels = {"upper":"🔵 Upper Bracket","lower":"🔴 Lower Bracket","grand_final":"⭐ Grand Final"}
         st.markdown(f'<span class="phase-badge">{phase_labels.get(phase,phase)}</span>', unsafe_allow_html=True)
@@ -443,7 +448,11 @@ with tab3:
                     type="primary"
                 ):
                     record_win_loss(left, right)
-                    matches[idx]["winner"] = left
+                    winner = left
+                    loser = right
+
+                    matches[idx]["winner"] = winner
+                    matches[idx]["loser"] = loser
                     st.session_state.tournament_log.append(f"⚔️ **{left}** ชนะ **{right}**")
                     st.session_state.current_match_index += 1
                     st.rerun()
