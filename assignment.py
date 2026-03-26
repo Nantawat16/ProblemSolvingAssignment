@@ -415,20 +415,38 @@ with tab3:
             with cl: st.markdown(f'<div class="team-badge">🔵 {left}</div>', unsafe_allow_html=True)
             with cv: st.markdown("<div style='text-align:center;font-size:1.8rem'>⚔️</div>", unsafe_allow_html=True)
             with cr: st.markdown(f'<div class="team-badge">🔴 {right}</div>', unsafe_allow_html=True)
+            
             st.write("")
             cw1, cw2 = st.columns(2)
+
             with cw1:
-                if st.button(f"🏆 {left} ชนะ", use_container_width=True, type="primary"):
-                    record_win_loss(left, right); matches[idx]["winner"] = left
+                if st.button(
+                    f"🏆 {left} ชนะ",
+                    key=f"left_win_{idx}",   # 👈 เพิ่มตรงนี้
+                    use_container_width=True,
+                    type="primary"
+                ):
+                    record_win_loss(left, right)
+                    matches[idx]["winner"] = left
                     st.session_state.tournament_log.append(f"⚔️ **{left}** ชนะ **{right}**")
-                    st.session_state.current_match_index += 1; st.rerun()
+                    st.session_state.current_match_index += 1
+                    st.rerun()
             with cw2:
-                if st.button(f"🏆 {right} ชนะ", use_container_width=True, type="primary"):
-                    record_win_loss(right, left); matches[idx]["winner"] = right
+                if st.button(
+                    f"🏆 {right} ชนะ",
+                    key=f"right_win_{idx}", 
+                    use_container_width=True,
+                    type="primary"
+                ):
+                    record_win_loss(right, left)
+                    matches[idx]["winner"] = right
                     st.session_state.tournament_log.append(f"⚔️ **{right}** ชนะ **{left}**")
-                    st.session_state.current_match_index += 1; st.rerun()
+                    st.session_state.current_match_index += 1
+                    st.rerun()
+
             st.progress(idx / len(matches))
             st.caption(f"Match {idx+1} / {len(matches)}")
+            
         else:
             winners = [m["winner"] for m in matches if m["winner"]]
             save_round_to_history(phase, matches)
