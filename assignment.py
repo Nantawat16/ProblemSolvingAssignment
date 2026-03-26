@@ -1,4 +1,3 @@
-
 import streamlit as st
 import random
 import plotly.graph_objects as go
@@ -25,19 +24,6 @@ for key, default in {
 
 teams = st.session_state.teams
 
-
-def build_matches(teams):
-    matches = []
-    for i in range(0, len(teams), 2):
-        left = teams[i]
-        right = teams[i+1] if i+1 < len(teams) else "BYE"
-        matches.append({
-            "left": left,
-            "right": right,
-            "winner": None,
-            "loser": None
-        })
-    return matches
 # ========================= Helper Functions =========================
 def sequential_search(name):
     for i, t in enumerate(teams):
@@ -396,22 +382,14 @@ with tab3:
                     team_names = [t["name"] for t in teams]
                     random.shuffle(team_names)
                     st.session_state.tournament_type = t_type
-                    st.session_state.upper_matches = build_matches(team_names)
-                    st.session_state.lower_matches = []
-                    st.session_state.lower_queue = []
-
+                    st.session_state.bracket_matches = build_bracket_matches(team_names)
                     st.session_state.current_match_index = 0
                     st.session_state.tournament_phase = "upper"
                     st.session_state.tournament_log = [f"🎮 **{t_type}** เริ่มแล้ว! ({len(teams)} ทีม)"]
                     st.rerun()
     else:
         phase = st.session_state.tournament_phase
-        if phase == "upper":
-            matches = st.session_state.upper_matches
-        elif phase == "lower":
-            matches = st.session_state.lower_matches
-        else:
-            matches = st.session_state.bracket_matches
+        matches = st.session_state.bracket_matches
         idx = st.session_state.current_match_index
         phase_labels = {"upper":"🔵 Upper Bracket","lower":"🔴 Lower Bracket","grand_final":"⭐ Grand Final"}
         st.markdown(f'<span class="phase-badge">{phase_labels.get(phase,phase)}</span>', unsafe_allow_html=True)
@@ -436,94 +414,55 @@ with tab3:
             with cl: st.markdown(f'<div class="team-badge">🔵 {left}</div>', unsafe_allow_html=True)
             with cv: st.markdown("<div style='text-align:center;font-size:1.8rem'>⚔️</div>", unsafe_allow_html=True)
             with cr: st.markdown(f'<div class="team-badge">🔴 {right}</div>', unsafe_allow_html=True)
-            
             st.write("")
             cw1, cw2 = st.columns(2)
-
             with cw1:
-                if st.button(
-                    f"🏆 {left} ชนะ",
-                    key=f"left_win_{idx}",   # 👈 เพิ่มตรงนี้
-                    use_container_width=True,
-                    type="primary"
-                ):
-                    record_win_loss(left, right)
-                    winner = left
-                    loser = right
-
-                    matches[idx]["winner"] = winner
-                    matches[idx]["loser"] = loser
+                if st.button(f"🏆 {left} ชนะ", use_container_width=True, type="primary"):
+                    record_win_loss(left, right); matches[idx]["winner"] = left
                     st.session_state.tournament_log.append(f"⚔️ **{left}** ชนะ **{right}**")
-                    st.session_state.current_match_index += 1
-                    st.rerun()
+                    st.session_state.current_match_index += 1; st.rerun()
             with cw2:
-                if st.button(
-                    f"🏆 {right} ชนะ",
-                    key=f"right_win_{idx}", 
-                    use_container_width=True,
-                    type="primary"
-                ):
-                    record_win_loss(right, left)
-                    matches[idx]["winner"] = right
+                if st.button(f"🏆 {right} ชนะ", use_container_width=True, type="primary"):
+                    record_win_loss(right, left); matches[idx]["winner"] = right
                     st.session_state.tournament_log.append(f"⚔️ **{right}** ชนะ **{left}**")
-                    st.session_state.current_match_index += 1
-                    st.rerun()
-
+                    st.session_state.current_match_index += 1; st.rerun()
             st.progress(idx / len(matches))
             st.caption(f"Match {idx+1} / {len(matches)}")
-            
         else:
             winners = [m["winner"] for m in matches if m["winner"]]
             save_round_to_history(phase, matches)
 
             if phase == "upper":
-                winners = []
-                losers = []
-
-                for m in matches:
-                    if m["winner"]:
-                        winners.append(m["winner"])
-                        losers.append(m["loser"])
-
                 if len(winners) == 1:
-                    # ได้แชมป์ Upper
-                    st.session_state.upper_winner = winners[0]
-
-                    # เอาคนแพ้ทั้งหมดไป Lower
-                    st.session_state.lower_matches = build_matches(losers)
-                    st.session_state.tournament_phase = "lower"
-                    st.session_state.current_match_index = 0
-                    st.session_state.tournament_log.append("🔴 **Lower Bracket เริ่ม!**")
-                    st.rerun()
+                    if st.session_state.tournament_type == "Single Elimination":
+                        st.session_state.champion = winners[0]; st.rerun()
+                    else:
+                        st.session_state.upper_winner = winners[0]
+                        lower_teams = [t["name"] for t in teams if t["loss"] == 1]
+                        if len(lower_teams) > 1:
+                            random.shuffle(lower_teams)
+                            st.session_state.bracket_matches = build_bracket_matches(lower_teams)
+                            st.session_state.current_match_index = 0
+                            st.session_state.tournament_phase = "lower"
+                            st.session_state.tournament_log.append("🔴 **Lower Bracket** เริ่ม!")
+                        else:
+                            st.session_state.lower_winner = lower_teams[0] if lower_teams else None
+                            st.session_state.tournament_phase = "grand_final"
+                        st.rerun()
                 else:
-                    # เล่น Upper ต่อ
-                    st.session_state.upper_matches = build_matches(winners)
-
-                    # เก็บคนแพ้สะสม
-                    st.session_state.lower_queue.extend(losers)
-
-                    st.session_state.current_match_index = 0
-                    st.rerun()
+                    st.session_state.bracket_matches = build_bracket_matches(winners)
+                    st.session_state.current_match_index = 0; st.rerun()
             elif phase == "lower":
-                winners = [m["winner"] for m in matches if m["winner"]]
-
                 if len(winners) == 1:
-                    # ได้ผู้ชนะ Lower
-                    st.session_state.lower_winner = winners[0]
-
-                    # ไป Grand Final
                     gf = [st.session_state.upper_winner, winners[0]]
-                    st.session_state.bracket_matches = build_matches(gf)
-
+                    st.session_state.bracket_matches = build_bracket_matches(gf)
                     st.session_state.current_match_index = 0
                     st.session_state.tournament_phase = "grand_final"
-                    st.session_state.tournament_log.append("⭐ **Grand Final เริ่ม!**")
+                    st.session_state.tournament_log.append("⭐ **Grand Final** เริ่ม!")
                     st.rerun()
                 else:
-                    # เล่น Lower ต่อ
-                    st.session_state.lower_matches = build_matches(winners)
-                    st.session_state.current_match_index = 0
-                    st.rerun()
+                    st.session_state.bracket_matches = build_bracket_matches(winners)
+                    st.session_state.current_match_index = 0; st.rerun()
             elif phase == "grand_final":
                 if winners:
                     st.session_state.champion = winners[0]; st.rerun()
